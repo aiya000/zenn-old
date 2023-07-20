@@ -80,12 +80,12 @@ TDDと比べて、実装とテストが真逆の順番になっていること�
 
 単体テストでは、下記の点について着目すべきです。
 
-- 「下記の項目」に対して、所望の性質を満たすこと
+- 「下記の項目」に対して、所望の性質を満たすこと [^normal-testing]
     - **ある特定の値**に対して
     - **ある境界**に対して
     - **全ての値**に対して
 
-また「**不正な値**」に対して、所望の性質を**満たさない**ことを確認するのも、重要です。
+また「**不正な値**」に対して、所望の性質を**満たさない**ことを確認するのも、重要です。[^abnormal-testing]
 
 具体的なコードを見ていきましょう。
 
@@ -93,7 +93,7 @@ TDDと比べて、実装とテストが真逆の順番になっていること�
 
 これはテストにおいて、最も単純な考え方です。
 
-例えば、下記の関数`div`で、第二引数`0`の場合に例外をthrowすること…を確認するとき、この観点が使えます。
+例えば次の関数`div`が、単に`x=10, y=2`の場合に`5`を確認できれば十分の場合、この観点が使えます。
 
 ```typescript
 function div(x: number, y: number): number {
@@ -106,17 +106,16 @@ function div(x: number, y: number): number {
 
 ```typescript
 test('throws if div by zero', () => {
-  const randomValue = 42 // 適当な値
-  expect(() => div(randomValue, 0)).toThrow()
+  expect(div(10, 2)).toBe(5)
 })
 ```
 
 どの観点でテストを書くか迷った場合は、これに立ち戻るのがよいでしょう。
 
-ただし、この観点でテストを書くと、テストケースは不足しがちです。
+ただし、この観点でテストを書くと、**テストケースは不足しがち**です。
 もし不足しがちだと感じた場合は、他の観点を試みてください。
 
-テストケースが単純でよい場合のみ、これを採用してください。
+**テストケースが単純でよい場合**のみ、これを採用してください。
 
 ### ある境界に対して、性質を満たす
 
@@ -301,9 +300,49 @@ test('makes lists by positive steps', () => {
 
 -->
 
-### 全ての値に対して、性質を満たす
+### 全ての値に対して、性質を満たす <a name="forall-values-satisfies"></a>
+
+これはテストにおいて、実用的かつ発展的な考え方です。
+
+テストケースが少なからず必要な全ての場合に、この観点が使えます。
+
+この観点では**Property Based Testing**（PBT）を用います。
+
+```typescript
+export function reversed<T>(array: T[]): T[] {
+    return [...array].reverse()
+}
+```
+
+```typescript
+test('forall value, reversed ○ reversed = identity', () => {
+  fc.assert(
+    fc.property(fc.array(fc.anything()), (xs) => {
+      expect(reversed(reversed(xs))).toEqual(xs)
+    })
+  )
+})
+```
 
 ### 不正な値に対して、性質を満たさないこと
+
+例えば、下記の関数`div`で、第二引数`0`の場合に例外をthrowすること…を確認するとき、この観点が使えます。
+
+```typescript
+function div(x: number, y: number): number {
+  if (y === 0) {
+    throw new Error('Div By Zero')
+  }
+  return x / y
+}
+```
+
+```typescript
+test('throws if div by zero', () => {
+  const randomValue = 42 // 適当な値
+  expect(() => div(randomValue, 0)).toThrow()
+})
+```
 
 ## スナップショットテスト
 ## VRT
@@ -316,4 +355,6 @@ test('makes lists by positive steps', () => {
 - - - - -
 - - - - -
 
-[^by-PBT]: Property Based Testingでテストケースをランダムに作成することにより、ある程度は未知に対するテストを書くことができます。Property Based Testingについては、[単体テストと結合テストガイドライン](https://zenn.dev/aiya000/articles/978fa504b1da3f)の「さいごに」を参照してください。」
+[^by-PBT]: Property Based Testingでテストケースをランダムに作成することにより、ある程度は未知に対するテストを書くことができます。Property Based Testingについては、[「全ての値に対して、性質を満たす」](#forall-values-satisfies)および[単体テストと結合テストガイドライン](https://zenn.dev/aiya000/articles/978fa504b1da3f)の「さいごに」を参照してください。」
+[^normal-testing]: これらは「これらの値を使えば、正常な動作をする」ということを確認することから「**正常系テスト**」と呼ばれます。
+[^abnormal-testing]: これらは正常系テストと対比し、「これらの値を使えば、正常でない動作をする（例えば例外を送出するなど。）」ということから「**異常系テスト**」と呼ばれます。
