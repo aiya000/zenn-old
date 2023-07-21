@@ -105,7 +105,7 @@ function div(x: number, y: number): number {
 ```
 
 ```typescript
-test('throws if div by zero', () => {
+test('div(10, 2) should be 5', () => {
   expect(div(10, 2)).toBe(5)
 })
 ```
@@ -344,8 +344,62 @@ test('forall value, reversed ○ reversed = identity', () => {
 PBTはそれを可能にします。
 今見た通りね！
 
-もちろん、これまでの観点で書いてきたテストケースを、あえてPBTで書き直すこともできます。
-PBTは多くのテスト観点の上位互換なのです。
+訓練のために、これまでの観点で書いてきたテストケースを、PBTで書き直して、PBTの直腸をつかんでみましょう。
+
+前述の`div`関数のテストでは、`div(10, 2) = 5`であることを確認しました。
+
+```typescript
+test('div(10, 2) should be 5', () => {
+  expect(div(10, 2)).toBe(5)
+})
+```
+
+これをPBTにしてみましょう。
+「任意の整数`x`に対して、`div(x, 2) = x / 2`」をテストすることにします。
+
+```typescript
+test('forall x, div(x, 2) = x / 2', () => {
+  fc.assert(
+    fc.property(fc.integer(), (x) => {
+      expect(div(x, 2)).toBe(x / 2)
+    })
+  )
+})
+```
+
+次は`range`関数のテストをPBTにしてみましょう。
+
+```typescript
+test('makes lists by positive steps', () => {
+  expect(range(0, 10)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+})
+```
+
+今回のケースでは（`div`のときのように、`range`をテスト内で再実装しない限り）
+PBTでは具体的な比較はできません。
+上記の`range(0, 10)`へのテストの`toEqual()`の引数`[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]`のように、具体的な既知の値が定まらないからです。
+
+ですので、性質（Property）の検査に置き換えます。
+具体的には、下記の`expect()`を使用している3行です。
+
+```typescript
+test('makes lists by positive steps', () => {
+  fc.assert(
+    fc.property(
+      fc.integer({ min: 0, max: 100 }),
+      fc.integer({ min: 0, max: 100 }),
+      (start, end) => {
+        fc.pre(start <= end)
+
+        const result = range(start, end)
+        expect(result.at(0)).toBe(start)
+        expect(result.at(-1)).toBe(end)
+        expect(result.length).toBe(end + 1 - start)
+      }
+    )
+  )
+})
+```
 
 TODO: 今までのテストをfast-checkで書き直す
 
