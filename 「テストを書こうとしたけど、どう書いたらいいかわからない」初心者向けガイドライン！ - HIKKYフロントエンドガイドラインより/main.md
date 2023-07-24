@@ -1,6 +1,7 @@
 本稿では、自動テストについての「ちょうど一歩くらい」進んだ内容について、述べていきます。
 
-これを読むことによって、テストを実施するための考え方がわかるようになります。
+「**テストを実施したいけど、どう書けばいいかわからない**」という全人類は、これを読んでください。
+損はさせませんよ！
 
 対象読者:
 - 実際にテストを実装してみようと思ったけど、**とっかかりがつかめなかった**
@@ -19,19 +20,7 @@
 - 実装駆動開発
     - **実装を書いてから**、テストを書く
 
-これについて、少し詳しく解説していきます。
-
-- - - - -
-
-**両方を採用する**
-
-ちなみにですが、実際は双方のいいとこ取りをした（上記2つの両方を採用した）
-「テストを書いてから、実装を書いて、そのあとにまたテストを書く」
-という手法もあります。
-
-- - - - -
-
-それを踏まえて、見ていきましょう。
+これについて、少し詳しく解説していきます。[^both-tdd-and-implement-driven]
 
 ## テスト駆動開発（TDD）
 
@@ -172,6 +161,8 @@ function range(start: number, end: number): Array<number> {
 }
 ```
 
+[^range]
+
 `if (start < 0)`でわかる通り、この関数`range`の境界は（`start`に対して）`-1, 0`です。
 
 まとめると、境界は以下にあることになります。
@@ -256,7 +247,216 @@ test('makes lists by positive steps', () => {
 - 参考
     - [単体テストのテスト項目の観点  |  ソフトウェア雑記](https://softwarenote.info/p738/)
 
-<!-- この定義の方が実用的、というか本来こうあるべきだったけど、話が難しくなるのでボツ。
+### 全ての値に対して、性質を満たす
+
+これはテストにおいて、実用的かつ発展的な考え方です。
+テストケースが少なからず必要な**全ての場合**に、この観点が使えます。
+
+この観点では**Property Based Testing**（PBT）を用います。
+雑に言えば、PBTは「**入力をランダムにしたテスト**」です。
+
+今までの観点とPBTが大きく違うのは「テストケースを自動生成する」こと、つまりテスト設計の大きな部分をコンピューターに任せられることです。
+今まではテストの対象をプログラマーがよく見て、テストケースの値をプログラマーが決定しなければいけませんでしたから。
+
+ここでは例のために、PBTライブラリとして、[fast-check](https://github.com/dubzzz/fast-check)を使います。
+簡単な例を見てみましょう。
+
+```typescript
+// 配列を逆向きにして返す関数
+export function reversed<T>(array: T[]): T[] {
+  return [...array].reverse()
+}
+```
+
+下記は、実際にfast-checkを使ったテストです。
+
+```typescript
+// reversed関数を2回適用すると、元の配列に戻る
+test('forall value, reversed ○ reversed = identity', () => {
+  fc.assert(
+    fc.property(fc.array(fc.anything()), (xs) => {
+      expect(reversed(reversed(xs))).toEqual(xs)
+    })
+  )
+})
+```
+
+このテストは
+「任意の型の、任意の配列`xs`について」
+「`reverse(reverse(xs)) = xs`が成り立つ」
+を表すものです。[^pseudo-forall]
+（そりゃ配列を2回逆向きにすれば、正向きになりますよね！）
+
+これまでのテスト観点では、こちらで用意した値についてのテストしかできなかったので、
+このような性質（関数自体の性質）は述べることができませんでした。
+
+PBTはそれを可能にします。
+今見た通りね！
+
+訓練のために、これまでの観点で書いてきたテストケースを、PBTで書き直して、PBTの直腸をつかんでみましょう。
+
+前述の`div`関数のテストでは、`div(10, 2) = 5`であることを確認しました。
+
+```typescript
+test('div(10, 2) should be 5', () => {
+  expect(div(10, 2)).toBe(5)
+})
+```
+
+これをPBTにしてみましょう。
+「任意の整数`x`に対して、`div(x, 2) = x / 2`」をテストすることにします。
+
+```typescript
+test('forall x, div(x, 2) = x / 2', () => {
+  fc.assert(
+    fc.property(fc.integer(), (x) => {
+      expect(div(x, 2)).toBe(x / 2)
+    })
+  )
+})
+```
+
+次は`range`関数のテストをPBTにしてみましょう。
+
+```typescript
+test('makes lists by positive steps', () => {
+  expect(range(0, 10)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+})
+```
+
+今回のケースでは（`range`をテスト内で再実装しない限り）
+PBTでは具体的な比較はできません。
+上記の`range(0, 10)`へのテストの`toEqual()`の引数`[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]`のように、具体的な既知の値が定まらないからです。
+
+ですので、性質（Property）の検査に置き換えます。
+具体的には、下記の`expect()`を使用している3行です。
+
+```typescript
+test('makes lists by positive steps', () => {
+  fc.assert(
+    fc.property(
+      fc.integer({ min: 0, max: 100 }),
+      fc.integer({ min: 0, max: 100 }),
+      (start, end) => {
+        fc.pre(start <= end)
+
+        const result = range(start, end)
+        expect(result.at(0)).toBe(start)
+        expect(result.at(-1)).toBe(end)
+        expect(result.length).toBe(end + 1 - start)
+      }
+    )
+  )
+})
+```
+
+※自然数を表すために`fc.integer({ min: 0, max: 100 })`を使っています。
+　fast-checkには`fc.nat()`という自然数を表す関数もありますが、今回の場合`range(x, 非常に大きい自然数)`などとすると、大きな配列を作ろうとしすぎてJavaScriptランタイム（JestやVitest）が壊れるので（実際に壊れたので！！）、`100`に制限しています。
+
+PBTが何であって、何でないのかがつかめてきたでしょうか。
+
+というところで、次に進もうと思います。
+
+### 不正な値に対して、性質を満たさないこと
+
+前述の3つのテスト観点は「どのように所望の性質を満たすか」を確認するものでした。
+
+それらも大切なテストでしたが、それとは別に「どのように所望の性質を**満たさないか**」をテスト化することも、同様に大切です。
+
+この観点は、前述の3つの観点に横断します。
+（つまり、前述の3つを用いて、本テスト観点を確かめることができます。）
+
+例えば、下記の関数`div`で、第二引数`0`の場合に例外をthrowすること
+（この場合に、`div`関数が「割り算をする」という役割を満たさないこと）
+を確認するとき、この観点が使えます。
+
+```typescript
+function div(x: number, y: number): number {
+  if (y === 0) {
+    throw new Error('Div By Zero')
+  }
+  return x / y
+}
+```
+
+```typescript
+test('throws if div by zero', () => {
+  const randomValue = 42 // 適当な値
+  expect(() => div(randomValue, 0)).toThrow()
+})
+```
+
+この観点は、前述の3つの観点に横断するのでした。
+つまりここでPBTや、境界値テストを使うこともできます。
+
+```typescript
+test('throws if div by zero', () => {
+  fc.assert(
+    // 任意の整数に対して、0で割ると、例外が送出される
+    fc.property(fc.integer(), (randomValue) => {
+      expect(() => div(randomValue, 0)).toThrow()
+    })
+  )
+})
+```
+
+必要であれば、同様に境界値テストを用いることもできます。
+
+## スナップショットテスト
+
+ここからはスナップショットテストを行うときの観点について、説明します。
+
+スナップショットテストは難しいことはなく、「**UIが予期せず変更されていないこと**」を確認するために行われます。
+
+ですので、導入する機会は
+
+- 理由はないけど、とりあえずスナップショットテストはしておく
+- UIが完成したので、スナップショットテストをしておく
+
+あたりかなと思います。
+**UIを勝手に変更されたくない場合に**、導入しておきましょう。
+
+## ビジュアルリグレッションテスト
+
+ビジュアルリグレッションテスト（VRT）についてです。
+
+これはスナップショットテストとかなり似た用途で用いられますが、それとはどちらかというと逆向きで
+「**UIが期待した通りに変更されていること**」
+を確認するために行われやすいと思います。
+
+ただしこちらは、GitHubなどと連携させて、PRが出されたときにそのPRが変更している箇所を
+**視覚的に表示する**
+という運用がしやすいです。
+
+やはり導入する機会はスナップショットテストと同じでしょう。
+
+## 結合テスト
+
+結合テストは、Testing Trophy[^testing-trophy]にて、各テストレイヤーの中で**最も比重を高くするべきテスト**だと主張されています。
+
+![](https://res.cloudinary.com/kentcdodds-com/image/upload/f_auto,q_auto,dpr_2.0,w_1600/v1622744540/kentcdodds.com/blog/the-testing-trophy-and-testing-classifications/trophy_wx9aen.png)
+
+- [The Testing Trophy and Testing Classifications](https://kentcdodds.com/blog/the-testing-trophy-and-testing-classifications)
+
+結合テストが担当する範囲は、Atomicデザイン[^atomic-design]でいう、Organisms以上・Templates以下のコンポーネントへのテストが、結合テストになるかと思います。[^is-organisms-integration-test]
+
+![](https://spice-factory.co.jp/wp-content/uploads/2022/01/e2d79507cf929987aa4068446da76d51.png)
+
+- Atomicデザインについて: [アトミックデザインとは？メリットや気を付けるポイントを徹底解説！｜スパイスファクトリー株式会社](https://spice-factory.co.jp/web/about-atmicdesign/)
+
+さて「結合テストはどのような観点で実施すべきか」ですが、これは
+
+## E2Eテスト
+# 具体的な書き方のOKパターンとNGパターン
+例えばコードの書き方はTSガイドラインに準拠等。
+
+- - - - -
+- - - - -
+
+# 付録
+## rangeのより正確な定義と、ふるまいについて
+
+[^range] より。
 
 ```typescript
 function range(start: number, end: number): Array<number> {
@@ -297,148 +497,16 @@ test('makes lists by positive steps', () => {
 })
 ```
 
--->
-
-### 全ての値に対して、性質を満たす <a name="forall-values-satisfies"></a>
-
-これはテストにおいて、実用的かつ発展的な考え方です。
-テストケースが少なからず必要な**全ての場合**に、この観点が使えます。
-
-この観点では**Property Based Testing**（PBT）を用います。
-雑に言えば、PBTは「**入力をランダムにしたテスト**」です。
-
-今までの観点とPBTが大きく違うのは「テストケースを自動生成する」こと、つまりテスト設計の大きな部分をコンピューターに任せられることです。
-今まではテストの対象をプログラマーがよく見て、テストケースの値をプログラマーが決定しなければいけませんでしたから。
-
-ここでは例のために、PBTライブラリとして、[fast-check](https://github.com/dubzzz/fast-check)を使います。
-簡単な例を見てみましょう。
-
-```typescript
-// 配列を逆向きにして返す関数
-export function reversed<T>(array: T[]): T[] {
-  return [...array].reverse()
-}
-```
-
-下記は、実際にfast-checkを使ったテストです。
-
-```typescript
-// reversed関数を2回適用すると、元の配列に戻る
-test('forall value, reversed ○ reversed = identity', () => {
-  fc.assert(
-    fc.property(fc.array(fc.anything()), (xs) => {
-      expect(reversed(reversed(xs))).toEqual(xs)
-    })
-  )
-})
-```
-
-このテストは
-「任意の型の、任意の配列`xs`について」
-「`reverse(reverse(xs)) = xs`が成り立つ」
-を表すものです。[^pseudo-forall]
-
-これまでのテスト観点では、こちらで用意した値についてのテストしかできなかったので、
-このような性質（関数自体の性質）は述べることができませんでした。
-
-PBTはそれを可能にします。
-今見た通りね！
-
-訓練のために、これまでの観点で書いてきたテストケースを、PBTで書き直して、PBTの直腸をつかんでみましょう。
-
-前述の`div`関数のテストでは、`div(10, 2) = 5`であることを確認しました。
-
-```typescript
-test('div(10, 2) should be 5', () => {
-  expect(div(10, 2)).toBe(5)
-})
-```
-
-これをPBTにしてみましょう。
-「任意の整数`x`に対して、`div(x, 2) = x / 2`」をテストすることにします。
-
-```typescript
-test('forall x, div(x, 2) = x / 2', () => {
-  fc.assert(
-    fc.property(fc.integer(), (x) => {
-      expect(div(x, 2)).toBe(x / 2)
-    })
-  )
-})
-```
-
-次は`range`関数のテストをPBTにしてみましょう。
-
-```typescript
-test('makes lists by positive steps', () => {
-  expect(range(0, 10)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-})
-```
-
-今回のケースでは（`div`のときのように、`range`をテスト内で再実装しない限り）
-PBTでは具体的な比較はできません。
-上記の`range(0, 10)`へのテストの`toEqual()`の引数`[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]`のように、具体的な既知の値が定まらないからです。
-
-ですので、性質（Property）の検査に置き換えます。
-具体的には、下記の`expect()`を使用している3行です。
-
-```typescript
-test('makes lists by positive steps', () => {
-  fc.assert(
-    fc.property(
-      fc.integer({ min: 0, max: 100 }),
-      fc.integer({ min: 0, max: 100 }),
-      (start, end) => {
-        fc.pre(start <= end)
-
-        const result = range(start, end)
-        expect(result.at(0)).toBe(start)
-        expect(result.at(-1)).toBe(end)
-        expect(result.length).toBe(end + 1 - start)
-      }
-    )
-  )
-})
-```
-
-TODO: 今までのテストをfast-checkで書き直す
-
-### 不正な値に対して、性質を満たさないこと
-
-TODO
-
-例えば、下記の関数`div`で、第二引数`0`の場合に例外をthrowすること…を確認するとき、この観点が使えます。
-
-```typescript
-function div(x: number, y: number): number {
-  if (y === 0) {
-    throw new Error('Div By Zero')
-  }
-  return x / y
-}
-```
-
-```typescript
-test('throws if div by zero', () => {
-  const randomValue = 42 // 適当な値
-  expect(() => div(randomValue, 0)).toThrow()
-})
-```
-
-TODO
-
-## スナップショットテスト
-## VRT
-## 結合テスト
-### UIコンポーネント
-### E2Eテスト
-# 具体的な書き方のOKパターンとNGパターン
-例えばコードの書き方はTSガイドラインに準拠等。
 
 - - - - -
 - - - - -
 
+[^both-tdd-and-implement-driven]: ちなみにですが、実際は双方のいいとこ取りをした（上記2つの両方を採用した）「テストを書いてから、実装を書いて、そのあとにまたテストを書く」という方法も、現実的にはあります。
+[^range]: 目ざとい方は気づかれたかもしれませんが、通常の`range`関数は`start < 0`で分岐するよりも、`end < start`で分岐した方が有用です。例えば前者であれば`range(-5, 0)`は`[]`になりますが、後者であれば`[-5, -4, -3, -2, -1, 0]`になります。多くの方は後者のふるまいを期待するかもしれません。今回は簡単のために前者の定義を採用し、後者の定義は[こちら（付録）](#付録)に載せるにとどめておきます。
 [^by-PBT]: Property Based Testingでテストケースをランダムに作成することにより、ある程度は未知に対するテストを書くことができます。Property Based Testingについては、[「全ての値に対して、性質を満たす」](#forall-values-satisfies)および[単体テストと結合テストガイドライン](https://zenn.dev/aiya000/articles/978fa504b1da3f)の「さいごに」を参照してください。」
 [^normal-testing]: これらは「これらの値を使えば、正常な動作をする」ということを確認することから「**正常系テスト**」と呼ばれます。
 [^abnormal-testing]: これらは正常系テストと対比し、「これらの値を使えば、正常でない動作をする（例えば例外を送出するなど。）」ということから「**異常系テスト**」と呼ばれます。
 [^pseudo-forall]: ここでわかりやすさのために「**任意の**」と言っていますが、PBTを使っていても、実際に全ての値でテストができる**わけではありません**。全ての値をテストすると、処理に大きな時間がかかってしまうからです。ここでは「任意の値」を「多くのランダムな値」に読み替えてください。
+[^testing-trophy]: 「各テストレイヤーのあるべき比率」を表した、トロフィー状の概念。
+[^atomic-design]: 弊社WebフロントエンドチームはAtomicデザインを採用しています。
+[^is-organisms-integration-test]: OrganismsとTemplatesへのテストは「それへの単体テスト」とする人も多いかと思います。僕はOrganismsとTemplatesへのテストは「それの配下にあるコンポーネント群への統合テスト」であると考えています。
