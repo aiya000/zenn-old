@@ -64,6 +64,23 @@ TDDと比べて、実装とテストが真逆の順番になっていること�
 - 実装をするときに、それが満たすべき性質（を表すテスト）が手元にない
 - 実装への先入観があるので、実装と独立したテストが書きにくい。実装が当然満たすであろうテストしか書けなくなる [^by-PBT]
 
+## おまけ: リファクタリング時テスト化について
+
+おまけ程度ですが、上記2つに当てはまらない、テスト化のタイミングもあります。
+その一例として「**リファクタリング時**テスト化」（リファクタリングするときに、テスト化する）を説明します。
+
+業務をしていると「既存のリファクタリングをしたいけど、現在の挙動を変更してしまわないか心配」という場合が多くあります。
+この場合はテスト化を介することで、挙動を担保することができます。
+
+その際のフローは以下になります。
+
+1. 既存のコードに対する、保障したいふるまいをテスト化する
+1. テストを実行する
+    - テストが通ることを確認する
+1. リファクタリングする
+1. テストを実行する
+    - テストが通ることを確認する
+
 # テストってどういう観点でどういう内容を書くべきなの？
 ## 単体テスト
 
@@ -77,6 +94,25 @@ TDDと比べて、実装とテストが真逆の順番になっていること�
 また「**不正な値**」に対して、所望の性質を**満たさない**ことを確認するのも、重要です。[^abnormal-testing]
 
 具体的なコードを見ていきましょう。
+
+- - - - -
+
+#### UIコンポーネントへの単体テスト
+
+ここで単体テストを関数に対して書いていますが、UIコンポーネントにも同等な考えを使えます。
+例えばVueであれば、引数はpropsとして、戻り値はViewの結果・状態として考えられます。
+
+また弊社Webフロントエンドチームでは、UIコンポーネントにおいて、Atomicデザインを採用しています。
+
+![](https://spice-factory.co.jp/wp-content/uploads/2022/01/e2d79507cf929987aa4068446da76d51.png)
+
+- [アトミックデザインとは？メリットや気を付けるポイントを徹底解説！｜スパイスファクトリー株式会社](https://spice-factory.co.jp/web/about-atmicdesign/)
+
+UIコンポーネントへの単体テストはこのうち、Atoms・Moleculesのコンポーネントのことになるでしょう。
+
+実際は[Vue Test Utils](https://v1.test-utils.vuejs.org/ja/)を用いるのがよいかもしれません。
+
+- - - - -
 
 ### ある特定の値に対して、性質を満たす
 
@@ -431,6 +467,7 @@ test('throws if div by zero', () => {
 やはり導入する機会はスナップショットテストと同じでしょう。
 
 ## 結合テストとE2Eテスト
+### 結合テストへの姿勢
 
 まずはじめに、Testing Trophy[^testing-trophy]にて、E2Eテストでない**結合テストは**各テストレイヤーの中で「**最も比重を高くするべきテスト**」だと主張されています。
 そして**E2Eテスト**は「**最も比重を低くすべきテスト**」です。
@@ -442,7 +479,48 @@ test('throws if div by zero', () => {
 （この章にて、以降「結合テスト」は「（E2Eテストでない）結合テスト」と読み替えてください。）
 
 それを踏まえ「結合テスト・E2Eテストはどのような観点で実施すべきか」を考えていきます。
-結合テストは、次の観点で作成されるべきです。
+まずは具体的なテストコードを見てみましょう。
+
+結合テストライブラリとして、ここでは[Testing Library](https://testing-library.com/docs/dom-testing-library/intro/)を用います。
+
+[UIコンポーネントへの単体テスト](#UIコンポーネントへの単体テスト)で述べた、Atomicデザインにおける単体テストの区分と対比して、Organisms・Templatesへのテストが結合テストになるでしょう。
+下記では`Component.vue`がOrganismsとします。
+
+```typescript
+import { render, fireEvent, screen } from '@testing-library/vue'
+import Component from './Component.vue'
+
+test('increments value on click', async () => {
+  render(Component)
+
+  screen.getByText('Times clicked: 0')
+
+  const button = screen.getByText('increment')
+
+  await fireEvent.click(button)
+  await fireEvent.click(button)
+
+  screen.getByText('Times clicked: 2')
+})
+```
+
+[Examples | Testing Library](https://testing-library.com/docs/vue-testing-library/examples)より引用。
+
+UIコンポーネントの結合テストの話ですが、
+テストトロフィーの作者でもあるTesting Libraryの作者は、Testing Libraryにて
+
+> テストがソフトウェアの使用方法に似ているほど、より信頼できるようになります
+
+と述べられています。
+
+- [Introduction | Testing Library](https://testing-library.com/docs/dom-testing-library/intro/)
+
+上述で例示したコードのように、「実装に着目する」よりも「ふるまいに着目する」方がよいでしょう。
+（実装に着目したい場合、単体テストが最適な場合があるかもしれません。）
+
+### 結合テストの観点
+
+観点についてですが、結合テストは次の観点で作成されるべきです。
 
 - 気になったケースがあったが、**単体テストではカバーできなかったので**、結合テスト化する
 - **設計が適切なことを確認するため**に、設計を結合テスト化する[^user-acceptance-test]
