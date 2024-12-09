@@ -1,5 +1,5 @@
 ---
-title:  型安全にvue-i18nの辞書から配列を取得して、変数に設定する
+title: 【型安全な実装】型安全にvue-i18nの辞書から配列を取得して、変数に設定する【の掘り下げ方】
 emoji: 🐕
 type: tech
 topics: [vue, i18n, nuxt, typescript, typesafe]
