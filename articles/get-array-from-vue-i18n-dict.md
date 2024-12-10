@@ -97,9 +97,12 @@ Draft PRですが以下に、弊社のNuxt QuickStarterリポジトリに、実�
 つまり以下のような方法では不十分ということです。
 
 :::message
-- ※ 以下では`ja.json`をi18n辞書として定義しています。今後同様に、nuxt.config.tsの`.vueI18n.locales[0].file`には`ja.json`が指定されているとします
-    - [locales](https://i18n.nuxtjs.org/docs/api/vue-i18n#locales)
-    - 要約すると、ここで例示するvue-i18nの環境の辞書のうち`ja`向けの設定が、`ja.json`の内容でされているということです
+以下では`ja.json`をi18n辞書として定義しています。
+今後同様に、nuxt.config.tsの`.vueI18n.locales[0].file`には`ja.json`が指定されているとします。
+
+- [locales - @nuxtjs/i18n](https://i18n.nuxtjs.org/docs/api/vue-i18n#locales)
+
+要約すると、ここで例示するvue-i18nの環境の辞書のうち`ja`向けの設定が、`ja.json`の内容でされているということです。
 :::
 
 - - -
@@ -221,7 +224,7 @@ for (const [, item] of Object.entries($tm('items.space') as any) as any) {
 
 or
 
-```
+```typescript
 for (const item of Object.values($tm('items.space') as any) as any) {
   console.log(item.text)
 }
