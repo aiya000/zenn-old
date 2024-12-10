@@ -17,7 +17,7 @@ i18nの辞書ファイル
 {
   "path": {
     "to": {
-      "list": ["a", "b", "c"]
+      "wordList": ["a", "b", "c"]
     }
   }
 }
@@ -42,8 +42,8 @@ export type UseI18nReturnType<Options extends UseI18nOptions = UseI18nOptions> =
  * @example
  * ```ts
  * import { useI18n } from 'vue-i18n'
- * const i18n = useI18n() // messageは { list: ['a', 'b', 'c'] } とする
- * const list = getI18nArray(i18n, 'list') // ['a', 'b', 'c']
+ * const i18n = useI18n() // messageは { path: { to: { wordList: ['a', 'b', 'c'] } } } とする
+ * const wordList = getI18nArray(i18n, 'path.to.wordList') // ['a', 'b', 'c']
  * ```
  */
 export const getI18nArray = (i18n: UseI18nReturnType, key: string): string[] =>
@@ -51,33 +51,34 @@ export const getI18nArray = (i18n: UseI18nReturnType, key: string): string[] =>
 ```
 
 配列を要求する側のコンポーネント
-```vue:RequringArray.vue
+```vue:ShowWordList.vue
 <template>
   <ul>
-    <li v-for="item in list" :key="item">{{ item }}</li>
+    <li v-for="word in wordList" :key="word">{{ word }}</li>
   </ul>
 </template>
 
 <script setup lang="ts">
 defineProps<{
-  list: string[] // なんらかの事情でArrayを要求している
+  wordList: string[] // なんらかの事情でArrayを要求している
 }>()
 </script>
 ```
 
 配列を取得して、propsとして渡す側のコンポーネント
+（※`:wordList`は`:wordList="wordList"`の略記です。）
 ```vue:Using.vue
 <template>
   <div>
     <!-- ... -->
-    <RequringArray :list="list" />
+    <ShowWordList :wordList />
     <!-- ... -->
   </div>
 </template>
 
 <script setup lang="ts">
 const i18n = useI18n()
-const list = getI18nArray(i18n, 'path.to.list')
+const wordList = getI18nArray(i18n, 'path.to.wordList')
 </script>
 ```
 
@@ -123,7 +124,7 @@ i18nの辞書ファイル
 <template>
   <div>
     <!-- ... -->
-    <RequringArray :list="list" />
+    <ShowWordList :wordList />
     <!-- ... -->
   </div>
 </template>
@@ -132,7 +133,7 @@ i18nの辞書ファイル
 const i18n = useI18n()
 
 // !! ここでは個別にアイテムを取得したくない
-const list = [
+const wordList = [
   `${i18n.t('path.to.item1')}`,
   `${i18n.t('path.to.item2')}`,
   `${i18n.t('path.to.item3')}`,
@@ -149,7 +150,7 @@ i18nの辞書ファイル
 {
   "path": {
     "to": {
-      "list": ["a", "b", "c"]
+      "wordList": ["a", "b", "c"]
     }
   }
 }
@@ -160,7 +161,7 @@ i18nの辞書ファイル
 <template>
   <div>
     <!-- ... -->
-    <RequringArray :list="list" />
+    <ShowWordList :wordList />
     <!-- ... -->
   </div>
 </template>
@@ -169,7 +170,7 @@ i18nの辞書ファイル
 const i18n = useI18n()
 
 // !! 一度に配列を取得している
-const list = getI18nArray(i18n, 'path.to.list')
+const wordList = getI18nArray(i18n, 'path.to.wordList')
 </script>
 ```
 
@@ -235,7 +236,9 @@ for (const item of Object.values($tm('items.space') as any) as any) {
 ついでに、私達の環境向けに書き替えておきます。
 
 ```typescript
-const list = Object.entries(i18n.tm('path.to.list') as any).map(([_, item]) => i18n.rt(item))
+const wordList =
+  Object.entries(i18n.tm('path.to.wordList') as any)
+  .map(([_, item]) => i18n.rt(item))
 ```
 
 しかし`as any`を使うのは、あまりよくないです。
@@ -300,7 +303,9 @@ rt(message: MessageFunction<VueMessageType> | VueMessageType): string;
 答えは次になります。
 
 ```typescript
-const list = Object.entries<VueMessageType>(i18n.tm('path.to.list')).map(([_, item]) => i18n.rt(item))
+const wordList =
+  Object.entries<VueMessageType>(i18n.tm('path.to.wordList'))
+  .map(([_, item]) => i18n.rt(item))
 ```
 
 やった！
@@ -358,7 +363,7 @@ export const getI18nArray = (i18n: UseI18nReturnType, key: string): string[] =>
 
 ```typescript
 const i18n = useI18n()
-const list = getI18nArray(i18n, 'path.to.list')
+const wordList = getI18nArray(i18n, 'path.to.wordList')
 ```
 
 # まとめ
@@ -373,7 +378,7 @@ i18nの辞書ファイルは次のようになっています。
 {
   "path": {
     "to": {
-      "list": ["a", "b", "c"]
+      "wordList": ["a", "b", "c"]
     }
   }
 }
@@ -397,8 +402,8 @@ export type UseI18nReturnType<Options extends UseI18nOptions = UseI18nOptions> =
  * @example
  * ```ts
  * import { useI18n } from 'vue-i18n'
- * const i18n = useI18n() // messageは { list: ['a', 'b', 'c'] } とする
- * const list = getI18nArray(i18n, 'list') // ['a', 'b', 'c']
+ * const i18n = useI18n() // messageは { path: { to: { wordList: ['a', 'b', 'c'] } } } とする
+ * const wordList = getI18nArray(i18n, 'path.to.wordList') // ['a', 'b', 'c']
  * ```
  */
 export const getI18nArray = (i18n: UseI18nReturnType, key: string): string[] =>
@@ -408,16 +413,16 @@ export const getI18nArray = (i18n: UseI18nReturnType, key: string): string[] =>
 上述の`getI18nArray`を使った例を見てみましょう。
 
 これは配列を要求する側のコンポーネントです。
-```vue:RequringArray.vue
+```vue:ShowWordList.vue
 <template>
   <ul>
-    <li v-for="item in list" :key="item">{{ item }}</li>
+    <li v-for="word in wordList" :key="word">{{ word }}</li>
   </ul>
 </template>
 
 <script setup lang="ts">
 defineProps<{
-  list: string[] // なんらかの事情でArrayを要求している
+  wordList: string[] // なんらかの事情でArrayを要求している
 }>()
 </script>
 ```
@@ -427,14 +432,14 @@ defineProps<{
 <template>
   <div>
     <!-- ... -->
-    <RequringArray :list="list" />
+    <ShowWordList :wordList />
     <!-- ... -->
   </div>
 </template>
 
 <script setup lang="ts">
 const i18n = useI18n()
-const list = getI18nArray(i18n, 'path.to.list')
+const wordList = getI18nArray(i18n, 'path.to.wordList')
 </script>
 ```
 
