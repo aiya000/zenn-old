@@ -1,4 +1,67 @@
-# 【Vue3】俺のcomputed(() => x.value)の値が子コンポーネントに勝手にアップデートされるんだが【TypeScript】
+:::details 追記: 🙅‍♂️->「`core.value`が子コンポーネントに更新される」 | 🙆‍♂️->「`core.value.value`が子コンポーネントに更新される」
+
+# 追記概要
+
+この記事は
+- 「`core.value`が子コンポーネントに更新される」
+ではなく
+- 「`core.value.value`が子コンポーネントに更新される」
+を意図して書いています！
+
+誤解の防止のために、追記させていただきました🙌
+
+おそらく上述の説明のみで十分かと思いますが、以下に詳細を記します。
+通常はこの折り畳みを閉じてもらい、続きを読んでください。
+もし後述の本編を読み、上述の追記の意味がわからなければ、説明の順序が前後しますが、下記の追記詳細を読んでください。
+
+## 追記詳細
+
+`core.value.value`と`core.value`（= `proxy.value`）がまぎらわしく、誤解させることに気が付きました 🙏
+
+意図としては後述では「`core.value`が子コンポーネントに更新される」ということを言いたいわけではなく、「`core.value.value`が子コンポーネントに更新される」ということです。
+
+具体的には、以下のようなB.vueの`updateFooBar`により、A.vueの`fooComputed`ごしに、`foo.value.bar`が更新されるということです。
+
+（追記なので、以下は実働を確認しておりません。失礼します！）
+
+```vue:A.vue
+<template>
+  <p>foo.value is {{ foo.value }}</p>
+  <!-- foo.value is { bar: 42 } --> <!-- クリックをしていない状態 -->
+  <!-- foo.value is { bar: 52 } --> <!-- クリック1回目 -->
+  <!-- foo.value is { bar: 62 } --> <!-- クリック1回目 -->
+  <!-- ... -->
+  <B :foo="fooComputed" />
+</template>
+
+<script setup lang="ts">
+const foo = ref({ bar: 42 })
+const fooComputed = computed(() => foo.value)
+</script>
+```
+
+```vue:B.vue
+<template>
+  <button @click="updateFooBar">update</button>
+</template>
+
+<script setup lang="ts">
+const { foo } = defineProps<{
+  foo: { bar: number }
+}>()
+function updateFooBar() {
+  foo.bar += 10
+}
+</script>
+```
+
+ここでの.vueと、後述の.vueの概念の対応としては、以下のようになります。
+
+- A.vue <-> HelloWorld.vue
+- B.vue <-> Child.vue
+
+:::
+
 # 俺の`computed(() => x.value)`の値が子コンポーネントに勝手にアップデートされるんだが
 
 - `type T`が`T extends Record<string, unknown>`で
